@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'oracle_metrics'
+    static_configs:
+      # 'oracle-exporter' matches the service name in docker-compose.yml
+      - targets: ['oracle-exporter:9161']

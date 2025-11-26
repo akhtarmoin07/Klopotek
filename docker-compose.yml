@@ -1,0 +1,103 @@
+services:
+  # 1. ORACLE DATABASE (Existing)
+  oracle-db:
+    image: gvenzl/oracle-xe:21-slim-faststart
+    container_name: klopotek-oracle
+    environment:
+      - ORACLE_PASSWORD=KlopotekSecret123
+      - APP_USER=stream_user
+      - APP_USER_PASSWORD=stream_pass
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+    networks:
+      - klopotek-net
+    healthcheck:
+      test: ["CMD", "sqlplus", "-L", "stream_user/stream_pass@//localhost:1521/XEPDB1", "select 1 from dual"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # 2. LIQUIBASE (Existing)
+  liquibase:
+    build: .
+    container_name: klopotek-deployment-manager
+    restart: on-failure
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+    networks:
+      - klopotek-net
+    volumes:
+      - ./changelog.sql:/liquibase/changelog.sql
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      echo 'Waiting for Oracle Database to be fully open...' &&
+      for i in {1..60}; do
+        if /liquibase/liquibase --url='jdbc:oracle:thin:@//oracle-db:1521/XEPDB1' \
+             --username=stream_user \
+             --password=stream_pass \
+             --driver=oracle.jdbc.OracleDriver \
+             validate > /dev/null 2>&1; then
+           echo 'Database is UP! Starting migration...'
+           break
+        fi
+        echo 'Database not ready yet... waiting 2s...'
+        sleep 2
+      done &&
+      /liquibase/liquibase update \
+      --url='jdbc:oracle:thin:@//oracle-db:1521/XEPDB1' \
+      --username=stream_user \
+      --password=stream_pass \
+      --changelog-file=changelog.sql \
+      --driver=oracle.jdbc.OracleDriver
+      "
+
+  # 3. ORACLE EXPORTER (The Bridge)
+  oracle-exporter:
+    image: iamseth/oracledb_exporter:latest
+    container_name: klopotek-metrics-exporter
+    environment:
+      # Connection string for the exporter
+      - DATA_SOURCE_NAME=stream_user/stream_pass@//oracle-db:1521/XEPDB1
+    ports:
+      - "9161:9161"
+    networks:
+      - klopotek-net
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+
+  # 4. PROMETHEUS (The Collector)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: klopotek-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - klopotek-net
+    depends_on:
+      - oracle-exporter
+
+  # 5. GRAFANA (The Dashboard)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: klopotek-grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - klopotek-net
+    depends_on:
+      - prometheus
+
+networks:
+  klopotek-net:
+    driver: bridge
+
+volumes:
+  oracle_data:
