@@ -40,3 +40,8 @@ ALTER TABLE authors ADD (gdpr_consent_status VARCHAR2(20) DEFAULT 'UNKNOWN');
 --comment: Insert New Royalty Entry for Metamorphosis
 INSERT INTO royalties (author_id, title_name, royalty_amount, payment_status) VALUES (1, 'The Metamorphosis', 1250.75, 'APPROVED');
 --rollback DELETE FROM royalties WHERE title_name = 'The Metamorphosis';
+
+--changeset moin.choudhury:6
+--comment: Insert new data in the authors table
+INSERT INTO authors (first_name, last_name, email) VALUES ('Benn', 'Duckket', 'Benn.Duckket@publishing.de');
+--rollback DELETE FROM authors WHERE first_name = 'Benn';
