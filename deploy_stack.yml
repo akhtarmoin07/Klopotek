@@ -1,0 +1,70 @@
+---
+- name: Deploy Klopotek Demo Stack
+  hosts: local
+  gather_facts: yes
+  vars:
+    # Target directory inside the Linux environment
+    deploy_dir: "/home/{{ ansible_user_id }}/klopotek_deployment"
+    # Source directory (Relative path from where you run the playbook)
+    source_dir: "../klopotek_demo"
+
+  tasks:
+    - name: Ensure deployment directory exists
+      file:
+        path: "{{ deploy_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy Infrastructure files to deployment directory
+      copy:
+        src: "{{ source_dir }}/{{ item }}"
+        dest: "{{ deploy_dir }}/"
+        mode: '0644'
+      loop:
+        - docker-compose.yml
+        - Dockerfile
+        - changelog.sql
+        - prometheus.yml  # <-- Added this file
+
+    - name: Tear down existing services (Ensure clean state)
+      community.docker.docker_compose_v2:
+        project_src: "{{ deploy_dir }}"
+        state: absent
+        remove_orphans: true
+      ignore_errors: yes
+
+    - name: Pull latest images
+      community.docker.docker_image:
+        name: "{{ item }}"
+        source: pull
+      loop:
+        - gvenzl/oracle-xe:21-slim-faststart
+        - iamseth/oracledb_exporter:latest
+        - prom/prometheus:latest
+        - grafana/grafana:latest
+
+    - name: Deploy Stack via Docker Compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ deploy_dir }}"
+        state: present
+        build: always
+      register: deployment_output
+
+    - name: Show Deployment Status
+      debug:
+        msg: "Deployment finished! Services: {{ deployment_output.services | default('No changes') }}"
+
+    - name: Wait for Liquibase to complete migration
+      command: docker wait klopotek-deployment-manager
+      register: migration_result
+      changed_when: false
+
+    - name: Verify Database Data (With Formatting)
+      command: >
+        docker exec klopotek-oracle sh -c "echo 'SET LINESIZE 200 PAGESIZE 100 FEEDBACK OFF; COLUMN title_name FORMAT a30; COLUMN payment_status FORMAT a20; SELECT * FROM royalties;' | sqlplus -S stream_user/stream_pass@//localhost:1521/XEPDB1"
+      register: oracle_data
+      changed_when: false
+
+    - name: Display Royalties Table
+      debug:
+        msg: "{{ oracle_data.stdout_lines }}"
