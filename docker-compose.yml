@@ -1,18 +1,28 @@
 services:
-  # 1. ORACLE DATABASE (Existing)
+  # 1. ORACLE DATABASE
   oracle-db:
+    # We use a lightweight, pre-built Oracle XE image.
+    # Why? Official Oracle images are huge. This one is optimized for fast startup in demos.
     image: gvenzl/oracle-xe:21-slim-faststart
     container_name: klopotek-oracle
     environment:
+      # These credentials are used by Liquibase and Exporter to connect later.
       - ORACLE_PASSWORD=KlopotekSecret123
       - APP_USER=stream_user
       - APP_USER_PASSWORD=stream_pass
     ports:
+      # Map container port 1521 to localhost:1521 so you can connect via SQLPlus.
       - "1521:1521"
+    # PERSISTENCE: This is the key line for "Data Safety".
+    # It tells Docker: "Save the database files in a named volume, not inside the container."
+    # If the container dies, the data survives in 'oracle_data'.
     volumes:
       - oracle_data:/opt/oracle/oradata
     networks:
+      # Connect to the shared network so other containers can talk to it by name.
       - klopotek-net
+    # HEALTHCHECK: This prevents race conditions.
+    # It actively runs a SQL query (`select 1 from dual`) to verify the DB is truly ready.
     healthcheck:
       test: ["CMD", "sqlplus", "-L", "stream_user/stream_pass@//localhost:1521/XEPDB1", "select 1 from dual"]
       interval: 10s
@@ -20,19 +30,28 @@ services:
       retries: 10
       start_period: 30s
 
-  # 2. LIQUIBASE (Existing)
+  # 2. LIQUIBASE (The Migration Runner)
   liquibase:
+    # Instead of pulling an image, we BUILD one from the Dockerfile in the current directory.
     build: .
     container_name: klopotek-deployment-manager
+    # SELF-HEALING: If this container crashes (e.g., connection refused), restart it automatically.
     restart: on-failure
     depends_on:
+      # Don't even try to start until Oracle says it's "Healthy".
       oracle-db:
         condition: service_healthy
     networks:
       - klopotek-net
     volumes:
+      # Mount the local changelog.sql into the container so Liquibase can read it.
       - ./changelog.sql:/liquibase/changelog.sql
+    # Override entrypoint to allow us to run a custom shell script.
     entrypoint: /bin/bash
+    # THE SMART WAIT SCRIPT:
+    # This loop runs `liquibase validate` repeatedly.
+    # It waits for the Oracle Listener AND the Database Service to be fully available.
+    # Only then does it run the `update` command.
     command: >
       -c "
       echo 'Waiting for Oracle Database to be fully open...' &&
@@ -58,10 +77,11 @@ services:
 
   # 3. ORACLE EXPORTER (The Bridge)
   oracle-exporter:
+    # This tool queries Oracle and exposes metrics in a format Prometheus understands.
     image: iamseth/oracledb_exporter:latest
     container_name: klopotek-metrics-exporter
     environment:
-      # Connection string for the exporter
+      # The connection string to talk to the database.
       - DATA_SOURCE_NAME=stream_user/stream_pass@//oracle-db:1521/XEPDB1
     ports:
       - "9161:9161"
@@ -76,6 +96,7 @@ services:
     image: prom/prometheus:latest
     container_name: klopotek-prometheus
     volumes:
+      # Mount our custom config file so Prometheus knows what to scrape.
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
@@ -96,8 +117,10 @@ services:
       - prometheus
 
 networks:
+  # Create a custom bridge network so containers can talk by name (DNS).
   klopotek-net:
     driver: bridge
 
 volumes:
+  # Define the named volume for persistence.
   oracle_data:

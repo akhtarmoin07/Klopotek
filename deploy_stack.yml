@@ -1,20 +1,21 @@
 ---
 - name: Deploy Klopotek Demo Stack
   hosts: local
-  gather_facts: yes
+  gather_facts: yes  # Collect info about the system (User ID, etc.)
   vars:
-    # Target directory inside the Linux environment
+    # Define variables for paths to keep the code clean.
     deploy_dir: "/home/{{ ansible_user_id }}/klopotek_deployment"
-    # Source directory (Relative path from where you run the playbook)
     source_dir: "../klopotek_demo"
 
   tasks:
+    # Task 1: Create the target folder
     - name: Ensure deployment directory exists
       file:
         path: "{{ deploy_dir }}"
         state: directory
         mode: '0755'
 
+    # Task 2: Copy ALL infrastructure files from your dev folder to the runtime folder.
     - name: Copy Infrastructure files to deployment directory
       copy:
         src: "{{ source_dir }}/{{ item }}"
@@ -24,8 +25,9 @@
         - docker-compose.yml
         - Dockerfile
         - changelog.sql
-        - prometheus.yml  # <-- Added this file
+        - prometheus.yml
 
+    # Task 3: Clean up old containers (optional but good for clean demos).
     - name: Tear down existing services (Ensure clean state)
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_dir }}"
@@ -33,6 +35,7 @@
         remove_orphans: true
       ignore_errors: yes
 
+    # Task 4: Ensure we have the latest Docker images.
     - name: Pull latest images
       community.docker.docker_image:
         name: "{{ item }}"
@@ -43,6 +46,8 @@
         - prom/prometheus:latest
         - grafana/grafana:latest
 
+    # Task 5: The Big One. Run 'docker compose up --build'.
+    # This triggers the entire infrastructure we defined in docker-compose.yml.
     - name: Deploy Stack via Docker Compose
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_dir }}"
@@ -50,21 +55,22 @@
         build: always
       register: deployment_output
 
-    - name: Show Deployment Status
-      debug:
-        msg: "Deployment finished! Services: {{ deployment_output.services | default('No changes') }}"
-
+    # Task 6: Wait for the migration container to finish its job.
     - name: Wait for Liquibase to complete migration
       command: docker wait klopotek-deployment-manager
       register: migration_result
       changed_when: false
 
+    # Task 7: AUTOMATED VERIFICATION.
+    # This runs a script inside the database container to query the data.
+    # It formats the output so it's readable in the logs.
     - name: Verify Database Data (With Formatting)
-      command: >
-        docker exec klopotek-oracle sh -c "echo 'SET LINESIZE 200 PAGESIZE 100 FEEDBACK OFF; COLUMN title_name FORMAT a30; COLUMN payment_status FORMAT a20; SELECT * FROM royalties;' | sqlplus -S stream_user/stream_pass@//localhost:1521/XEPDB1"
+      shell: >
+        docker exec klopotek-oracle sh -c "echo 'SET PAGESIZE 50000 LINESIZE 300 TRIMSPOOL ON FEEDBACK OFF HEADING ON; COLUMN title_name FORMAT a30; COLUMN payment_status FORMAT a20; SELECT * FROM royalties;' | sqlplus -S stream_user/stream_pass@//localhost:1521/XEPDB1"
       register: oracle_data
       changed_when: false
 
+    # Task 8: Print the result.
     - name: Display Royalties Table
       debug:
         msg: "{{ oracle_data.stdout_lines }}"
