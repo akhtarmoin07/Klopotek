@@ -1,30 +1,23 @@
 ---
 - name: Deploy Klopotek Demo Stack
   hosts: local
-  gather_facts: yes  # Collect info about the system (User ID, etc.)
-<<<<<<< HEAD
+  gather_facts: yes
 
-  # FIX 1: Load the secret file from the CURRENT folder
-  # (Matches where you actually created it)
+  # FIX 1: You MUST include this to load the variables!
   vars_files:
     - secrets.yml
 
-=======
->>>>>>> d709437a820e1bd3f5c7992afcf1add61a391c62
   vars:
-    # Define variables for paths to keep the code clean.
     deploy_dir: "/home/{{ ansible_user_id }}/klopotek_deployment"
-    source_dir: "../klopotek_demo"
+    source_dir: "."
 
   tasks:
-    # Task 1: Create the target folder
     - name: Ensure deployment directory exists
       file:
         path: "{{ deploy_dir }}"
         state: directory
         mode: '0755'
 
-    # Task 2: Copy ALL infrastructure files from your dev folder to the runtime folder.
     - name: Copy Infrastructure files to deployment directory
       copy:
         src: "{{ source_dir }}/{{ item }}"
@@ -36,7 +29,6 @@
         - changelog.sql
         - prometheus.yml
 
-    # Task 3: Clean up old containers (optional but good for clean demos).
     - name: Tear down existing services (Ensure clean state)
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_dir }}"
@@ -44,7 +36,6 @@
         remove_orphans: true
       ignore_errors: yes
 
-    # Task 4: Ensure we have the latest Docker images.
     - name: Pull latest images
       community.docker.docker_image:
         name: "{{ item }}"
@@ -55,37 +46,30 @@
         - prom/prometheus:latest
         - grafana/grafana:latest
 
-    # Task 5: The Big One. Run 'docker compose up --build'.
-    # This triggers the entire infrastructure we defined in docker-compose.yml.
     - name: Deploy Stack via Docker Compose
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_dir }}"
         state: present
         build: always
-        # INJECT SECRETS AS ENVIRONMENT VARIABLES
-              # FIX 3: Use the standard 'environment' keyword for task-level env vars
+      register: deployment_output
+      # This puts the variables into the shell environment so Docker Compose can see them
       environment:
         ORACLE_PASSWORD: "{{ vault_oracle_password }}"
         APP_USER: "{{ vault_db_user }}"
         APP_USER_PASSWORD: "{{ vault_db_pass }}"
-      register: deployment_output
 
-    # Task 6: Wait for the migration container to finish its job.
     - name: Wait for Liquibase to complete migration
       command: docker wait klopotek-deployment-manager
       register: migration_result
       changed_when: false
 
-    # Task 7: AUTOMATED VERIFICATION.
-    # This runs a script inside the database container to query the data.
-    # It formats the output so it's readable in the logs.
     - name: Verify Database Data (With Formatting)
+      # FIX 2: Use the variables here too! Don't hardcode 'stream_user/stream_pass'
       shell: >
-        docker exec klopotek-oracle sh -c "echo 'SET PAGESIZE 50000 LINESIZE 300 TRIMSPOOL ON FEEDBACK OFF HEADING ON; COLUMN title_name FORMAT a30; COLUMN payment_status FORMAT a20; SELECT * FROM royalties;' | sqlplus -S stream_user/stream_pass@//localhost:1521/XEPDB1"
+        docker exec klopotek-oracle sh -c "echo 'SET PAGESIZE 50000 LINESIZE 300 TRIMSPOOL ON FEEDBACK OFF HEADING ON; COLUMN title_name FORMAT a30; COLUMN payment_status FORMAT a20; SELECT * FROM royalties;' | sqlplus -S {{ vault_db_user }}/{{ vault_db_pass }}@//localhost:1521/XEPDB1"
       register: oracle_data
       changed_when: false
 
-    # Task 8: Print the result.
     - name: Display Royalties Table
       debug:
         msg: "{{ oracle_data.stdout_lines }}"
