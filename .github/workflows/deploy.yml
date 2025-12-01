@@ -28,6 +28,10 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        
+# FIX: Copy the secret file from your local dev folder into the runner workspace
+      - name: Inject Secrets File
+        run: cp /mnt/c/Users/AnumS/klopotek_demo/secrets.yml .
 
       - name: Run Ansible Playbook
         run: |
