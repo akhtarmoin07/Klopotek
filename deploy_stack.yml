@@ -27,7 +27,7 @@
         mode: '0644'
       loop:
         - docker-compose.yml
-        - Dockerfile
+        - dockerfile
         - changelog.sql
         - prometheus.yml
 
