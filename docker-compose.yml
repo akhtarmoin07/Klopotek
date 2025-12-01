@@ -82,13 +82,8 @@ services:
     image: iamseth/oracledb_exporter:latest
     container_name: klopotek-metrics-exporter
     environment:
-<<<<<<< HEAD
       # SECRETS: Inject user/pass into connection string
       - DATA_SOURCE_NAME=${APP_USER}/${APP_USER_PASSWORD}@//oracle-db:1521/XEPDB1
-=======
-      # The connection string to talk to the database.
-      - DATA_SOURCE_NAME=stream_user/stream_pass@//oracle-db:1521/XEPDB1
->>>>>>> d709437a820e1bd3f5c7992afcf1add61a391c62
     ports:
       - "9161:9161"
     networks:
