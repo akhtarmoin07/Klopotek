@@ -7,16 +7,10 @@ services:
     container_name: klopotek-oracle
     environment:
       # These credentials are used by Liquibase and Exporter to connect later.
-<<<<<<< HEAD
       # SECRETS: Injected by Ansible at runtime
       - ORACLE_PASSWORD=${ORACLE_PASSWORD}
       - APP_USER=${APP_USER}
       - APP_USER_PASSWORD=${APP_USER_PASSWORD}
-=======
-      - ORACLE_PASSWORD=KlopotekSecret123
-      - APP_USER=stream_user
-      - APP_USER_PASSWORD=stream_pass
->>>>>>> d709437a820e1bd3f5c7992afcf1add61a391c62
     ports:
       # Map container port 1521 to localhost:1521 so you can connect via SQLPlus.
       - "1521:1521"
