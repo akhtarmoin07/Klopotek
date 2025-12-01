@@ -3,7 +3,7 @@
   hosts: local
   gather_facts: yes
 
-  # FIX 1: You MUST include this to load the variables!
+  # 1. LOAD SECRETS
   vars_files:
     - secrets.yml
 
@@ -12,12 +12,14 @@
     source_dir: "."
 
   tasks:
+    # Task 1
     - name: Ensure deployment directory exists
       file:
         path: "{{ deploy_dir }}"
         state: directory
         mode: '0755'
 
+    # Task 2
     - name: Copy Infrastructure files to deployment directory
       copy:
         src: "{{ source_dir }}/{{ item }}"
@@ -29,6 +31,7 @@
         - changelog.sql
         - prometheus.yml
 
+    # Task 3
     - name: Tear down existing services (Ensure clean state)
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_dir }}"
@@ -36,6 +39,7 @@
         remove_orphans: true
       ignore_errors: yes
 
+    # Task 4
     - name: Pull latest images
       community.docker.docker_image:
         name: "{{ item }}"
@@ -46,30 +50,38 @@
         - prom/prometheus:latest
         - grafana/grafana:latest
 
+    # Task 5
     - name: Deploy Stack via Docker Compose
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_dir }}"
         state: present
         build: always
       register: deployment_output
-      # This puts the variables into the shell environment so Docker Compose can see them
+      # ENVIRONMENT VARIABLES (Correct indentation is crucial here)
       environment:
         ORACLE_PASSWORD: "{{ vault_oracle_password }}"
         APP_USER: "{{ vault_db_user }}"
         APP_USER_PASSWORD: "{{ vault_db_pass }}"
 
+    # Task 6
+    - name: Show Deployment Status
+      debug:
+        msg: "Deployment finished! Services: {{ deployment_output.services | default('No changes') }}"
+
+    # Task 7
     - name: Wait for Liquibase to complete migration
       command: docker wait klopotek-deployment-manager
       register: migration_result
       changed_when: false
 
+    # Task 8
     - name: Verify Database Data (With Formatting)
-      # FIX 2: Use the variables here too! Don't hardcode 'stream_user/stream_pass'
       shell: >
         docker exec klopotek-oracle sh -c "echo 'SET PAGESIZE 50000 LINESIZE 300 TRIMSPOOL ON FEEDBACK OFF HEADING ON; COLUMN title_name FORMAT a30; COLUMN payment_status FORMAT a20; SELECT * FROM royalties;' | sqlplus -S {{ vault_db_user }}/{{ vault_db_pass }}@//localhost:1521/XEPDB1"
       register: oracle_data
       changed_when: false
 
+    # Task 9
     - name: Display Royalties Table
       debug:
         msg: "{{ oracle_data.stdout_lines }}"
