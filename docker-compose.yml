@@ -125,4 +125,3 @@ networks:
 volumes:
   # Define the named volume for persistence.
   oracle_data:
-  
