@@ -1,0 +1,46 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # Job 1: CI (Continuous Integration) - Run Linting & Tests
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfiles
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: klopotek_demo/Dockerfile
+
+      - name: Lint Ansible Playbook
+        uses: ansible/ansible-lint@v6
+        with:
+          path: "klopotek_ansible/"
+
+  # Job 2: CD (Continuous Deployment) - Run Ansible on YOUR Laptop
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    # IMPORTANT: This tells GitHub to look for YOUR laptop
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Decrypt Secrets (Optional/Advanced)
+        # In a real setup, you'd inject the vault pass here.
+        # For this local demo, we assume the runner has the password file.
+        run: echo "Secrets are managed by Ansible Vault on the host."
+
+      - name: Run Ansible Playbook
+        run: |
+          cd klopotek_ansible
+          # We use the .vault_pass file that exists on your machine but is ignored by git
+          ansible-playbook -i inventory.ini deploy_stack.yml --vault-password-file ~/.vault_pass

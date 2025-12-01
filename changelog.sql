@@ -45,3 +45,8 @@ INSERT INTO royalties (author_id, title_name, royalty_amount, payment_status) VA
 --comment: Insert new data in the authors table
 INSERT INTO authors (first_name, last_name, email) VALUES ('Benn', 'Duckket', 'Benn.Duckket@publishing.de');
 --rollback DELETE FROM authors WHERE first_name = 'Benn';
+
+
+--changeset moin.choudhury:7
+INSERT INTO royalties (author_id, title_name, royalty_amount, payment_status) VALUES (1, 'The Finnical Survey', 7800 , 'APPROVED');
+--rollback DELETE FROM royalties WHERE title_name = 'The Finnical Survey'
