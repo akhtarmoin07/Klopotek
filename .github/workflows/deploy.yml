@@ -17,12 +17,12 @@ jobs:
       - name: Lint Dockerfiles
         uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: Dockerfile
+          dockerfile: dockerfile
 
       - name: Lint Ansible Playbook
         uses: ansible/ansible-lint@v6
         with:
-          path: "klopotek_ansible/"
+          path: "deploy_stack.yml"
 
   # Job 2: CD (Continuous Deployment) - Run Ansible on YOUR Laptop
   deploy:
