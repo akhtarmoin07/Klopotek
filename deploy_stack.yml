@@ -2,12 +2,15 @@
 - name: Deploy Klopotek Demo Stack
   hosts: local
   gather_facts: yes  # Collect info about the system (User ID, etc.)
+<<<<<<< HEAD
 
   # FIX 1: Load the secret file from the CURRENT folder
   # (Matches where you actually created it)
   vars_files:
     - secrets.yml
 
+=======
+>>>>>>> d709437a820e1bd3f5c7992afcf1add61a391c62
   vars:
     # Define variables for paths to keep the code clean.
     deploy_dir: "/home/{{ ansible_user_id }}/klopotek_deployment"
