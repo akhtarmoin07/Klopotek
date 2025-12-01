@@ -74,7 +74,17 @@
       register: migration_result
       changed_when: false
 
-    # Task 8
+    - name: Verify Database Data (With Formatting)
+      ansible.builtin.shell: >
+        docker exec klopotek-oracle sh -c "echo 'SET PAGESIZE 50000 LINESIZE 300 TRIMSPOOL ON FEEDBACK OFF HEADING ON;
+        COLUMN title_name FORMAT a30;
+        COLUMN payment_status FORMAT a20;
+        SELECT * FROM royalties;'
+        | sqlplus -S {{ vault_db_user }}/{{ vault_db_pass }}@//localhost:1521/XEPDB1"
+      register: oracle_data
+      changed_when: false
+
+    # Task 9
     - name: Display Royalties Table
       ansible.builtin.debug:
         msg: "{{ oracle_data.stdout_lines }}"
