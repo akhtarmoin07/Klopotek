@@ -1,7 +1,7 @@
 ---
 - name: Deploy Klopotek Demo Stack
   hosts: local
-  gather_facts: yes
+  gather_facts: true
 
   # 1. LOAD SECRETS
   vars_files:
@@ -14,14 +14,14 @@
   tasks:
     # Task 1
     - name: Ensure deployment directory exists
-      file:
+      ansible.builtin.file:
         path: "{{ deploy_dir }}"
         state: directory
         mode: '0755'
 
     # Task 2
     - name: Copy Infrastructure files to deployment directory
-      copy:
+      ansible.builtin.copy:
         src: "{{ source_dir }}/{{ item }}"
         dest: "{{ deploy_dir }}/"
         mode: '0644'
@@ -37,7 +37,7 @@
         project_src: "{{ deploy_dir }}"
         state: absent
         remove_orphans: true
-      ignore_errors: yes
+      failed_when: false  # Replaces ignore_errors: yes
 
     # Task 4
     - name: Pull latest images
@@ -57,7 +57,7 @@
         state: present
         build: always
       register: deployment_output
-      # ENVIRONMENT VARIABLES (Correct indentation is crucial here)
+      # ENVIRONMENT VARIABLES
       environment:
         ORACLE_PASSWORD: "{{ vault_oracle_password }}"
         APP_USER: "{{ vault_db_user }}"
@@ -65,23 +65,26 @@
 
     # Task 6
     - name: Show Deployment Status
-      debug:
+      ansible.builtin.debug:
         msg: "Deployment finished! Services: {{ deployment_output.services | default('No changes') }}"
 
     # Task 7
     - name: Wait for Liquibase to complete migration
-      command: docker wait klopotek-deployment-manager
+      ansible.builtin.command: docker wait klopotek-deployment-manager
       register: migration_result
       changed_when: false
 
     # Task 8
     - name: Verify Database Data (With Formatting)
-      shell: >
+      ansible.builtin.shell: |
+        set -o pipefail
         docker exec klopotek-oracle sh -c "echo 'SET PAGESIZE 50000 LINESIZE 300 TRIMSPOOL ON FEEDBACK OFF HEADING ON; COLUMN title_name FORMAT a30; COLUMN payment_status FORMAT a20; SELECT * FROM royalties;' | sqlplus -S {{ vault_db_user }}/{{ vault_db_pass }}@//localhost:1521/XEPDB1"
       register: oracle_data
       changed_when: false
+      args:
+        executable: /bin/bash
 
     # Task 9
     - name: Display Royalties Table
-      debug:
+      ansible.builtin.debug:
         msg: "{{ oracle_data.stdout_lines }}"
