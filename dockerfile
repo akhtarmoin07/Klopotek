@@ -4,7 +4,7 @@ FROM liquibase/liquibase:4.29.0
 
 USER root
 
-# Fix DL3008, DL3009, DL3015, DL3059:
+# Fix DL3008, DL3009, DL3015, DL3059
 # 1. Combine all RUN commands into one (reduces layers).
 # 2. Use --no-install-recommends (keeps image small).
 # 3. Clean up apt lists after install (saves space).
