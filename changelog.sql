@@ -50,3 +50,13 @@ INSERT INTO authors (first_name, last_name, email) VALUES ('Benn', 'Duckket', 'B
 --changeset moin.choudhury:7
 INSERT INTO royalties (author_id, title_name, royalty_amount, payment_status) VALUES (1, 'The Finnical Survey', 7800 , 'APPROVED');
 --rollback DELETE FROM royalties WHERE title_name = 'The Finnical Survey'
+
+--changeset moin.choudhury:8
+--comment: Insert a new data in the royalties tables
+INSERT INTO royalties (author_id, title_name, royalty_amount, payment_status) VALUES (1, 'The BBC Times', 9999 , 'PENDING');
+--rollback DELETE FROM royalties WHERE title_name = 'The BBC Times'
+
+--changeset moin.choudhury:9
+--comment: Insert new data in the authors table
+INSERT INTO authors (first_name, last_name, email) VALUES ('Sky', 'Vanns', 'Vanns.Sky@newstimes.de');
+--rollback DELETE FROM authors WHERE first_name = 'Sky';
