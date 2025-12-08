@@ -60,3 +60,9 @@ INSERT INTO royalties (author_id, title_name, royalty_amount, payment_status) VA
 --comment: Insert new data in the authors table
 INSERT INTO authors (first_name, last_name, email) VALUES ('Sky', 'Vanns', 'Vanns.Sky@newstimes.de');
 --rollback DELETE FROM authors WHERE first_name = 'Sky';
+
+
+--changeset moin.choudhury:10
+--comment: Insert new data in the authors table
+INSERT INTO authors (first_name, last_name, email) VALUES ('Bruce', 'Wayne', 'Bruce.WayneEmpire.us');
+--rollback DELETE FROM authors WHERE first_name = 'bruce'
