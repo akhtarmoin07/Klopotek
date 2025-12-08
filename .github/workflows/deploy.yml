@@ -19,7 +19,7 @@ jobs:
 
       - name: Lint Ansible Playbook
         uses: ansible/ansible-lint@v6
-        # No path argument needed; it auto-discovers
+        # No 'with' path needed, auto-discovery works best
 
   deploy:
     needs: test
@@ -29,10 +29,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-# FIX: Copy the secret file from your local dev folder into the runner workspace
-      - name: Inject Secrets File
-        run: cp /mnt/c/Users/AnumS/klopotek_demo/secrets.yml .
-
       - name: Run Ansible Playbook
+        # 1. INJECT SECRETS AS ENV VARS
+        env:
+          ORACLE_PASSWORD: ${{ secrets.ORACLE_PASSWORD }}
+          APP_USER: ${{ secrets.APP_USER }}
+          APP_USER_PASSWORD: ${{ secrets.APP_USER_PASSWORD }}
+        # 2. RUN WITHOUT VAULT PASSWORD ARGUMENT
         run: |
-          ansible-playbook -i inventory.ini deploy_stack.yml --vault-password-file ~/.vault_pass
+          ansible-playbook -i inventory.ini deploy_stack.yml
