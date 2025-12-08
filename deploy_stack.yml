@@ -3,23 +3,23 @@
   hosts: local
   gather_facts: true
 
-  # 1. LOAD SECRETS
-  vars_files:
-    - secrets.yml
+  # 1. REMOVED 'vars_files' (Secrets now come from Env)
 
   vars:
     deploy_dir: "/home/{{ ansible_user_id }}/klopotek_deployment"
     source_dir: "."
+    # 2. READ SECRETS FROM ENV (Injected by GitHub)
+    oracle_password: "{{ lookup('env', 'ORACLE_PASSWORD') }}"
+    app_user: "{{ lookup('env', 'APP_USER') }}"
+    app_user_password: "{{ lookup('env', 'APP_USER_PASSWORD') }}"
 
   tasks:
-    # Task 1
     - name: Ensure deployment directory exists
       ansible.builtin.file:
         path: "{{ deploy_dir }}"
         state: directory
         mode: '0755'
 
-    # Task 2
     - name: Copy Infrastructure files to deployment directory
       ansible.builtin.copy:
         src: "{{ source_dir }}/{{ item }}"
@@ -31,15 +31,13 @@
         - changelog.sql
         - prometheus.yml
 
-    # Task 3
     - name: Tear down existing services (Ensure clean state)
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_dir }}"
         state: absent
         remove_orphans: true
-      failed_when: false  # Replaces ignore_errors: yes
+      failed_when: false
 
-    # Task 4
     - name: Pull latest images
       community.docker.docker_image:
         name: "{{ item }}"
@@ -50,26 +48,24 @@
         - prom/prometheus:latest
         - grafana/grafana:latest
 
-    # Task 5
     - name: Deploy Stack via Docker Compose
       community.docker.docker_compose_v2:
         project_src: "{{ deploy_dir }}"
         state: present
         build: always
       register: deployment_output
-      # ENVIRONMENT VARIABLES
+      # 3. PASS ANSIBLE VARIABLES (FROM ENV) TO DOCKER
       environment:
-        ORACLE_PASSWORD: "{{ vault_oracle_password }}"
-        APP_USER: "{{ vault_db_user }}"
-        APP_USER_PASSWORD: "{{ vault_db_pass }}"
+        ORACLE_PASSWORD: "{{ oracle_password }}"
+        APP_USER: "{{ app_user }}"
+        APP_USER_PASSWORD: "{{ app_user_password }}"
 
-    # Task 6
     - name: Show Deployment Status
       ansible.builtin.debug:
         msg: "Deployment finished! Services: {{ deployment_output.services | default('No changes') }}"
 
-    # Task 7
     - name: Wait for Liquibase to complete migration
       ansible.builtin.command: docker wait klopotek-deployment-manager
       register: migration_result
       changed_when: false
+
